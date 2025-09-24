@@ -1,0 +1,4 @@
+pkg update && pkg upgrade -y
+pkg install python git -y
+pkg install termux-api -y
+pip install flask
