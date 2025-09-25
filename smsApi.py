@@ -118,17 +118,61 @@ def send_sms():
 
 @app.route("/send-bulk-sms", methods=["POST"])
 def send_bulk_sms():
-    """Envia SMS em lote usando multithreading"""
+    """Envia SMS em lote usando multithreading com mensagens personalizadas"""
     data = request.get_json(force=True)
     recipients = data.get("recipients", [])
-    message = data.get("message")
+    message = data.get("message")  # Mensagem padrão (opcional)
     max_workers = data.get("max_workers", 5)  # Limite de threads simultâneas
     
-    if not recipients or not message:
-        return jsonify({"error": "Campos 'recipients' e 'message' são obrigatórios"}), 400
+    if not recipients:
+        return jsonify({"error": "Campo 'recipients' é obrigatório"}), 400
     
     if not isinstance(recipients, list):
         return jsonify({"error": "Campo 'recipients' deve ser uma lista"}), 400
+    
+    # Validar formato dos recipients
+    processed_recipients = []
+    
+    for i, recipient in enumerate(recipients):
+        if isinstance(recipient, str):
+            # Formato antigo: lista de números com mensagem padrão
+            if not message:
+                return jsonify({
+                    "error": f"Mensagem é obrigatória quando recipients[{i}] é uma string"
+                }), 400
+            processed_recipients.append({
+                "to": recipient,
+                "message": message
+            })
+        elif isinstance(recipient, dict):
+            # Formato novo: objetos com "to" e "message"
+            to_number = recipient.get("to")
+            msg = recipient.get("message")
+            
+            if not to_number:
+                return jsonify({
+                    "error": f"Campo 'to' é obrigatório em recipients[{i}]"
+                }), 400
+            
+            if not msg:
+                # Se não tem mensagem específica, usa a mensagem padrão
+                if not message:
+                    return jsonify({
+                        "error": f"Mensagem é obrigatória em recipients[{i}] ou como mensagem padrão"
+                    }), 400
+                msg = message
+            
+            processed_recipients.append({
+                "to": to_number,
+                "message": msg
+            })
+        else:
+            return jsonify({
+                "error": f"recipients[{i}] deve ser uma string ou objeto com 'to' e 'message'"
+            }), 400
+    
+    if not processed_recipients:
+        return jsonify({"error": "Nenhum destinatário válido encontrado"}), 400
     
     # Limite de workers para não sobrecarregar o sistema
     max_workers = min(max_workers, 10)
@@ -138,22 +182,23 @@ def send_bulk_sms():
     
     # Usar ThreadPoolExecutor para envio em paralelo
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submeter todas as tarefas
-        future_to_number = {
-            executor.submit(sms_sender.send_single_sms, number, message): number 
-            for number in recipients
+        # Submeter todas as tarefas com mensagens personalizadas
+        future_to_recipient = {
+            executor.submit(sms_sender.send_single_sms, recipient["to"], recipient["message"]): recipient 
+            for recipient in processed_recipients
         }
         
         # Coletar resultados conforme completam
-        for future in as_completed(future_to_number):
-            number = future_to_number[future]
+        for future in as_completed(future_to_recipient):
+            recipient = future_to_recipient[future]
             try:
                 result = future.result(timeout=30)
                 results.append(result)
             except Exception as e:
                 results.append({
                     "status": "error",
-                    "to": number,
+                    "to": recipient["to"],
+                    "message": recipient["message"],
                     "detail": str(e),
                     "timestamp": datetime.now().isoformat()
                 })
@@ -164,7 +209,7 @@ def send_bulk_sms():
     
     return jsonify({
         "batch_id": batch_id,
-        "total": len(recipients),
+        "total": len(processed_recipients),
         "sent": sent_count,
         "errors": error_count,
         "results": results

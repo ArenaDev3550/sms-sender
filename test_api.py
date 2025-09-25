@@ -15,7 +15,7 @@ def test_single_sms():
     print("=== Teste SMS Único (Síncrono) ===")
     url = f"{BASE_URL}/send-sms"
     data = {
-        "to": "5511999999999",
+        "to": "5562998462262",
         "message": "Teste de SMS único"
     }
     
@@ -32,7 +32,7 @@ def test_async_sms():
     print("=== Teste SMS Único (Assíncrono) ===")
     url = f"{BASE_URL}/send-sms"
     data = {
-        "to": "5511999999999",
+        "to": "5562998462262",
         "message": "Teste de SMS assíncrono",
         "async": True
     }
@@ -56,18 +56,16 @@ def test_async_sms():
     print()
 
 def test_bulk_sms():
-    """Teste de SMS em lote"""
-    print("=== Teste SMS em Lote ===")
+    """Teste de SMS em lote (formato antigo)"""
+    print("=== Teste SMS em Lote (Formato Antigo) ===")
     url = f"{BASE_URL}/send-bulk-sms"
     data = {
         "recipients": [
-            "5511999999999",
-            "5511888888888",
-            "5511777777777",
-            "5511666666666",
-            "5511555555555"
+            "5562998462262",
+            "5562996898638",
+            "5562998428232"
         ],
-        "message": "Teste de SMS em lote com multithreading",
+        "message": "Teste de SMS em lote com multithreading - mensagem única",
         "max_workers": 3
     }
     
@@ -85,7 +83,87 @@ def test_bulk_sms():
         print(f"Erros: {result['errors']}")
         print(f"Resultados individuais:")
         for r in result['results']:
-            print(f"  - {r['to']}: {r['status']} ({r.get('duration', 'N/A')}s)")
+            print(f"  - {r['to']}: {r['status']} - {r['message'][:30]}... ({r.get('duration', 'N/A')}s)")
+    print()
+
+def test_bulk_sms_personalized():
+    """Teste de SMS em lote com mensagens personalizadas"""
+    print("=== Teste SMS em Lote (Mensagens Personalizadas) ===")
+    url = f"{BASE_URL}/send-bulk-sms"
+    data = {
+        "recipients": [
+            {
+                "to": "5562998462262",
+                "message": "Olá João! Esta é sua mensagem personalizada."
+            },
+            {
+                "to": "5562996898638", 
+                "message": "Oi Maria! Sua mensagem especial está aqui."
+            },
+            {
+                "to": "5562998428232",
+                "message": "E aí Pedro! Mensagem exclusiva para você."
+            }
+        ],
+        "max_workers": 3
+    }
+    
+    start_time = time.time()
+    response = requests.post(url, json=data)
+    end_time = time.time()
+    
+    print(f"Status: {response.status_code}")
+    print(f"Tempo total: {end_time - start_time:.2f}s")
+    
+    if response.status_code == 200:
+        result = response.json()
+        print(f"Total: {result['total']}")
+        print(f"Enviados: {result['sent']}")
+        print(f"Erros: {result['errors']}")
+        print(f"Resultados individuais:")
+        for r in result['results']:
+            print(f"  - {r['to']}: {r['status']} - {r['message'][:30]}... ({r.get('duration', 'N/A')}s)")
+    else:
+        print(f"Erro: {response.json()}")
+    print()
+
+def test_bulk_sms_mixed():
+    """Teste de SMS em lote com formato misto (alguns com mensagem personalizada, outros com padrão)"""
+    print("=== Teste SMS em Lote (Formato Misto) ===")
+    url = f"{BASE_URL}/send-bulk-sms"
+    data = {
+        "recipients": [
+            {
+                "to": "5562998462262",
+                "message": "Mensagem personalizada para João"
+            },
+            {
+                "to": "5562996898638"
+                # Este usará a mensagem padrão
+            },
+            "5562998428232"  # Formato antigo, usará mensagem padrão
+        ],
+        "message": "Esta é a mensagem padrão para quem não tem personalizada",
+        "max_workers": 3
+    }
+    
+    start_time = time.time()
+    response = requests.post(url, json=data)
+    end_time = time.time()
+    
+    print(f"Status: {response.status_code}")
+    print(f"Tempo total: {end_time - start_time:.2f}s")
+    
+    if response.status_code == 200:
+        result = response.json()
+        print(f"Total: {result['total']}")
+        print(f"Enviados: {result['sent']}")
+        print(f"Erros: {result['errors']}")
+        print(f"Resultados individuais:")
+        for r in result['results']:
+            print(f"  - {r['to']}: {r['status']} - {r['message'][:40]}... ({r.get('duration', 'N/A')}s)")
+    else:
+        print(f"Erro: {response.json()}")
     print()
 
 def test_health_and_stats():
@@ -106,7 +184,7 @@ def stress_test():
     def send_sms_thread(thread_id):
         url = f"{BASE_URL}/send-sms"
         data = {
-            "to": f"551199999999{thread_id}",
+            "to": f"5562998462262{thread_id}",
             "message": f"Teste stress thread {thread_id}",
             "async": True
         }
@@ -142,6 +220,8 @@ if __name__ == "__main__":
         test_single_sms()
         test_async_sms()
         test_bulk_sms()
+        test_bulk_sms_personalized()
+        test_bulk_sms_mixed()
         test_health_and_stats()
         
         # Teste de stress

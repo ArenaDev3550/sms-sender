@@ -93,6 +93,7 @@ curl http://localhost:5000/sms-status/abc123-def456
 
 ### 5. Enviar SMS em Lote
 
+**Formato 1: Mensagem única para todos (formato antigo)**
 ```bash
 curl -X POST http://localhost:5000/send-bulk-sms \
   -H "Content-Type: application/json" \
@@ -102,7 +103,50 @@ curl -X POST http://localhost:5000/send-bulk-sms \
       "5511888888888",
       "5511777777777"
     ],
-    "message": "Mensagem em lote",
+    "message": "Mensagem única para todos",
+    "max_workers": 3
+  }'
+```
+
+**Formato 2: Mensagem personalizada para cada destinatário (NOVO)**
+```bash
+curl -X POST http://localhost:5000/send-bulk-sms \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipients": [
+      {
+        "to": "5511999999999",
+        "message": "Olá João! Esta é sua mensagem personalizada."
+      },
+      {
+        "to": "5511888888888", 
+        "message": "Oi Maria! Sua mensagem especial está aqui."
+      },
+      {
+        "to": "5511777777777",
+        "message": "E aí Pedro! Mensagem exclusiva para você."
+      }
+    ],
+    "max_workers": 3
+  }'
+```
+
+**Formato 3: Formato misto (alguns personalizados, outros padrão)**
+```bash
+curl -X POST http://localhost:5000/send-bulk-sms \
+  -H "Content-Type: application/json" \
+  -d '{
+    "recipients": [
+      {
+        "to": "5511999999999",
+        "message": "Mensagem personalizada para João"
+      },
+      {
+        "to": "5511888888888"
+      },
+      "5511777777777"
+    ],
+    "message": "Mensagem padrão para quem não tem personalizada",
     "max_workers": 3
   }'
 ```
@@ -151,9 +195,31 @@ python test_api.py
 - `async` (boolean, opcional): Envio assíncrono (padrão: false)
 
 ### SMS em Lote
-- `recipients` (array): Lista de números destinatários
-- `message` (string): Mensagem a ser enviada
+- `recipients` (array): Lista de destinatários. Pode ser:
+  - **Formato simples**: Array de strings com números de telefone
+  - **Formato personalizado**: Array de objetos com `to` e `message`
+  - **Formato misto**: Combinação dos dois formatos
+- `message` (string, opcional): Mensagem padrão (obrigatória no formato simples)
 - `max_workers` (int, opcional): Máximo de threads simultâneas (padrão: 5, máximo: 10)
+
+**Exemplos de recipients:**
+```json
+// Formato simples (requer message padrão)
+"recipients": ["5511999999999", "5511888888888"]
+
+// Formato personalizado
+"recipients": [
+  {"to": "5511999999999", "message": "Oi João!"},
+  {"to": "5511888888888", "message": "Olá Maria!"}
+]
+
+// Formato misto
+"recipients": [
+  {"to": "5511999999999", "message": "Mensagem personalizada"},
+  {"to": "5511888888888"},  // usará message padrão
+  "5511777777777"           // usará message padrão
+]
+```
 
 ## Otimizações Implementadas
 

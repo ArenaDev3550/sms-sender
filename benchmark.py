@@ -69,28 +69,27 @@ class SMSBenchmark:
         self._print_stats("SMS Assíncronos", times, successes, count)
     
     def bulk_sms_test(self, batch_sizes=[5, 10, 20]):
-        """Teste de SMS em lote com diferentes tamanhos"""
+        """Teste de SMS em lote com diferentes tamanhos e formatos"""
         print(f"\n=== Teste SMS em Lote ===")
         
         for batch_size in batch_sizes:
             print(f"\nTestando lote de {batch_size} SMS...")
             
-            recipients = [f"5533{str(i).zfill(9)}" for i in range(batch_size)]
+            # Teste com mensagem única (formato antigo)
+            recipients_simple = [f"5533{str(i).zfill(9)}" for i in range(batch_size)]
             
             start_time = time.time()
-            
             response = requests.post(f"{BASE_URL}/send-bulk-sms", json={
-                "recipients": recipients,
-                "message": f"Teste lote {batch_size} SMS",
+                "recipients": recipients_simple,
+                "message": f"Teste lote {batch_size} SMS - mensagem única",
                 "max_workers": min(batch_size, 5)
             })
-            
             end_time = time.time()
             duration = end_time - start_time
             
             if response.status_code == 200:
                 result = response.json()
-                print(f"Lote {batch_size}: {duration:.2f}s")
+                print(f"Lote {batch_size} (mensagem única): {duration:.2f}s")
                 print(f"  - Total: {result['total']}")
                 print(f"  - Enviados: {result['sent']}")
                 print(f"  - Erros: {result['errors']}")
@@ -98,6 +97,65 @@ class SMSBenchmark:
                 print(f"  - SMS/segundo: {(result['total']/duration):.2f}")
             else:
                 print(f"Erro no lote {batch_size}: {response.status_code}")
+            
+            # Teste com mensagens personalizadas (formato novo)
+            recipients_personalized = [
+                {
+                    "to": f"5544{str(i).zfill(9)}",
+                    "message": f"Mensagem personalizada #{i+1} para teste de performance"
+                }
+                for i in range(batch_size)
+            ]
+            
+            start_time = time.time()
+            response = requests.post(f"{BASE_URL}/send-bulk-sms", json={
+                "recipients": recipients_personalized,
+                "max_workers": min(batch_size, 5)
+            })
+            end_time = time.time()
+            duration = end_time - start_time
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"Lote {batch_size} (personalizado): {duration:.2f}s")
+                print(f"  - Total: {result['total']}")
+                print(f"  - Enviados: {result['sent']}")
+                print(f"  - Erros: {result['errors']}")
+                print(f"  - Taxa sucesso: {(result['sent']/result['total']*100):.1f}%")
+                print(f"  - SMS/segundo: {(result['total']/duration):.2f}")
+            else:
+                print(f"Erro no lote personalizado {batch_size}: {response.status_code}")
+            
+            # Teste formato misto
+            recipients_mixed = []
+            for i in range(batch_size):
+                if i % 2 == 0:  # Pares com mensagem personalizada
+                    recipients_mixed.append({
+                        "to": f"5555{str(i).zfill(9)}",
+                        "message": f"Personalizada #{i+1}"
+                    })
+                else:  # Ímpares apenas com número (usará mensagem padrão)
+                    recipients_mixed.append(f"5555{str(i).zfill(9)}")
+            
+            start_time = time.time()
+            response = requests.post(f"{BASE_URL}/send-bulk-sms", json={
+                "recipients": recipients_mixed,
+                "message": "Mensagem padrão para formato misto",
+                "max_workers": min(batch_size, 5)
+            })
+            end_time = time.time()
+            duration = end_time - start_time
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"Lote {batch_size} (formato misto): {duration:.2f}s")
+                print(f"  - Total: {result['total']}")
+                print(f"  - Enviados: {result['sent']}")
+                print(f"  - Erros: {result['errors']}")
+                print(f"  - Taxa sucesso: {(result['sent']/result['total']*100):.1f}%")
+                print(f"  - SMS/segundo: {(result['total']/duration):.2f}")
+            else:
+                print(f"Erro no lote misto {batch_size}: {response.status_code}")
     
     def concurrent_requests_test(self, threads=5, requests_per_thread=5):
         """Teste de requests simultâneas"""
