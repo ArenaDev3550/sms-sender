@@ -1,4 +1,34 @@
+#!/bin/bash
+
+# Script de instalação para SMS API no Termux
+
+echo "=== Instalação da SMS API com Multithreading ==="
+
+# Atualizar sistema
+echo "Atualizando pacotes do Termux..."
 pkg update && pkg upgrade -y
-pkg install python git -y
-pkg install termux-api -y
-pip install flask
+
+# Instalar dependências básicas
+echo "Instalando Python, Git e Termux API..."
+pkg install python git termux-api -y
+
+# Instalar bibliotecas Python
+echo "Instalando bibliotecas Python..."
+pip install flask requests
+
+# Configurar storage (necessário para algumas operações)
+echo "Configurando acesso ao storage..."
+termux-setup-storage
+
+# Permissões SMS
+echo "IMPORTANTE: Certifique-se de dar permissões de SMS para o Termux nas configurações do Android"
+
+echo "=== Instalação concluída! ==="
+echo ""
+echo "Para iniciar a API:"
+echo "  python smsApi.py"
+echo ""
+echo "Para testar:"
+echo "  python test_api.py"
+echo ""
+echo "A API estará disponível em: http://localhost:5000"
