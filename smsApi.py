@@ -1,12 +1,13 @@
 from flask import Flask, request, jsonify
-import subprocess
 import threading
-import time
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Queue
 import uuid
 from datetime import datetime
+
+# Importar a classe SMSSender do arquivo separado
+from sms_sender import SMSSender
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -17,74 +18,11 @@ app = Flask(__name__)
 # Pool de threads para processar SMS
 thread_pool = ThreadPoolExecutor(max_workers=10)
 
-# Dicionário para rastrear status dos SMS
-sms_status = {}
-
 # Queue para batch processing
 sms_queue = Queue()
 
-class SMSSender:
-    def __init__(self):
-        self.lock = threading.Lock()
-        
-    def send_single_sms(self, number, message, sms_id=None):
-        """Envia um SMS individual"""
-        try:
-            start_time = time.time()
-            cmd = ["termux-sms-send", "-n", str(number), message]
-            
-            # Executa o comando com timeout
-            process = subprocess.run(
-                cmd, 
-                check=True, 
-                capture_output=True, 
-                text=True, 
-                timeout=30
-            )
-            
-            end_time = time.time()
-            
-            result = {
-                "status": "sent",
-                "to": number,
-                "message": message,
-                "duration": round(end_time - start_time, 2),
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            if sms_id:
-                with self.lock:
-                    sms_status[sms_id] = result
-                    
-            logger.info(f"SMS enviado para {number} em {result['duration']}s")
-            return result
-            
-        except subprocess.TimeoutExpired:
-            error_result = {
-                "status": "error",
-                "detail": "Timeout ao enviar SMS",
-                "to": number,
-                "timestamp": datetime.now().isoformat()
-            }
-            if sms_id:
-                with self.lock:
-                    sms_status[sms_id] = error_result
-            return error_result
-            
-        except Exception as e:
-            error_result = {
-                "status": "error",
-                "detail": str(e),
-                "to": number,
-                "timestamp": datetime.now().isoformat()
-            }
-            if sms_id:
-                with self.lock:
-                    sms_status[sms_id] = error_result
-            return error_result
-
-# Instância do sender
-sms_sender = SMSSender()
+# Instância do sender com rate limiting (20 SMS por minuto)
+sms_sender = SMSSender(rate_limit=20, rate_window=60)
 
 @app.route("/send-sms", methods=["POST"])
 def send_sms():
@@ -218,8 +156,7 @@ def send_bulk_sms():
 @app.route("/sms-status/<sms_id>", methods=["GET"])
 def get_sms_status(sms_id):
     """Consulta o status de um SMS enviado assincronamente"""
-    with sms_sender.lock:
-        status = sms_status.get(sms_id)
+    status = sms_sender.get_sms_status(sms_id)
     
     if status:
         return jsonify(status)
@@ -239,20 +176,21 @@ def health_check():
         "pending_sms": sms_queue.qsize() if hasattr(sms_queue, 'qsize') else 0
     })
 
+@app.route("/rate-limit", methods=["GET"])
+def get_rate_limit_status():
+    """Retorna informações detalhadas sobre o rate limiting"""
+    return jsonify(sms_sender.get_rate_limit_status())
+
 @app.route("/stats", methods=["GET"])
 def get_stats():
     """Retorna estatísticas da API"""
-    with sms_sender.lock:
-        total_sms = len(sms_status)
-        sent_sms = len([s for s in sms_status.values() if s.get("status") == "sent"])
-        error_sms = total_sms - sent_sms
+    # Usar as estatísticas da classe SMSSender
+    sms_stats = sms_sender.get_stats()
     
     return jsonify({
-        "total_sms": total_sms,
-        "sent_sms": sent_sms,
-        "error_sms": error_sms,
+        "sms_sender_stats": sms_stats,
         "active_threads": threading.active_count(),
-        "success_rate": round((sent_sms / total_sms * 100), 2) if total_sms > 0 else 0
+        "rate_limit_status": sms_sender.get_rate_limit_status()
     })
 
 if __name__ == "__main__":
