@@ -9,7 +9,7 @@ import uuid
 logger = logging.getLogger(__name__)
 
 class SMSSender:
-    def __init__(self, rate_limit=60, rate_window=30):
+    def __init__(self, rate_limit=500, rate_window=30):
         """
         Inicializa o SMS Sender com rate limiting
         

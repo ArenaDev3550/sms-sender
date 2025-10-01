@@ -21,8 +21,8 @@ thread_pool = ThreadPoolExecutor(max_workers=10)
 # Queue para batch processing
 sms_queue = Queue()
 
-# Instância do sender com rate limiting (20 SMS por minuto)
-sms_sender = SMSSender(rate_limit=60, rate_window=30)
+# Instância do sender com rate limiting (500 SMS por minuto)
+sms_sender = SMSSender(rate_limit=500, rate_window=30)
 
 @app.route("/send-sms", methods=["POST"])
 def send_sms():
